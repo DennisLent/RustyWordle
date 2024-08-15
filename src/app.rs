@@ -170,7 +170,6 @@ impl MyEguiApp {
                                             self.game_state = Some(GameState::CorrectGuess);
                                         }
                                         (GameState::WrongGuess, word) => {
-                                            println!("{}", GameState::WrongGuess);
                                             self.game_state = Some(GameState::WrongGuess);
                                             self.last_guessed_word = word;
                                         }
@@ -355,11 +354,11 @@ impl MyEguiApp {
                             ui.label(format!("{} is not long enough or not in the dicitonary", guessed_word));
                         }
                         Some(GameState::Lost) => {
-                            ui.label(format!("Sorry you lost. The word was: {} \n Here's the defintion of the word if you are curious: \n {}", self.word, self.definition));
+                            ui.label(format!("Sorry you lost :( \n \n  The word was: {} \n Here's the defintion of the word if you are curious: \n {}", self.word, self.definition));
                         }
                         Some(GameState::Won) => {
                             ui.label(format!(
-                                "Congratulations you won! Here's the definition of the word if you are curious: \n{}",
+                                "Congratulations you won! \n\nHere's the definition of the word if you are curious: \n{}",
                                 self.definition
                             ));
                         }
