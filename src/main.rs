@@ -45,9 +45,7 @@ fn main() {
         }
 
         //only the raw file exists so we clean it
-        (true, true) => {
-            println!("DICTIONARY IN PLACE")
-        }
+        (true, true) => {}
     }
 
     // Else both dictionaries exist and we can proceed with the game

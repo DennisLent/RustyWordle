@@ -1,9 +1,9 @@
 use crate::game_logic::WordleGame;
-use crate::states::{LetterState, GameState};
+use crate::states::{GameState, LetterState};
 use crate::utils::selector::pick_random_word;
 use crate::WORLD_LENGTH;
 use eframe::egui;
-use egui::{Vec2, ViewportBuilder};
+use egui::{RichText, Vec2, ViewportBuilder};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -11,12 +11,13 @@ use std::sync::Arc;
 /// This struct creates the 5 letter grid with 6 attempts and holds the word and its defintion
 #[derive(Debug)]
 pub struct MyEguiApp {
-    grid: [[char; 5]; 6],
+    grid: [[char; WORLD_LENGTH]; WORLD_LENGTH + 1],
     current_row: usize,
     word: String,
     definition: String,
     game_logic: WordleGame,
     game_state: Option<GameState>,
+    last_guessed_word: Option<String>,
     index: usize,
     dictionary: Arc<HashMap<String, String>>,
 }
@@ -32,7 +33,7 @@ impl MyEguiApp {
         dict: Arc<HashMap<String, String>>,
     ) -> Self {
         Self {
-            grid: [[' '; 5]; 6],
+            grid: [[' '; WORLD_LENGTH]; WORLD_LENGTH + 1],
             current_row: 0,
             word: word.clone(),
             definition: definition,
@@ -40,17 +41,19 @@ impl MyEguiApp {
             game_state: None,
             index: 0,
             dictionary: dict,
+            last_guessed_word: None,
         }
     }
 
     fn new_game(&mut self) {
-        let (new_word, new_definition) = match pick_random_word(self.dictionary.as_ref(), WORLD_LENGTH) {
-            Ok((word, defintion)) => (word, defintion),
-            Err(e) => {
-                println!("Error: {}", e);
-                return;
-            }
-        };
+        let (new_word, new_definition) =
+            match pick_random_word(self.dictionary.as_ref(), WORLD_LENGTH) {
+                Ok((word, defintion)) => (word, defintion),
+                Err(e) => {
+                    println!("Error: {}", e);
+                    return;
+                }
+            };
 
         self.word = new_word.clone();
         self.definition = new_definition;
@@ -69,7 +72,10 @@ impl MyEguiApp {
         let native_options = eframe::NativeOptions {
             viewport: ViewportBuilder {
                 min_inner_size: Some(Vec2 { x: 200.0, y: 850.0 }),
-                max_inner_size: Some(Vec2 { x: 450.0, y: 1200.0 }),
+                max_inner_size: Some(Vec2 {
+                    x: 450.0,
+                    y: 1200.0,
+                }),
                 resizable: Some(false),
                 ..Default::default()
             },
@@ -147,43 +153,49 @@ impl MyEguiApp {
                 if *pressed {
                     if let Some(letter) = self.key_to_char(key) {
                         // check for a letter else it is an acction
-                        if letter.is_ascii_alphabetic() && self.current_row < 6 {
+                        if letter.is_ascii_alphabetic() && self.current_row < WORLD_LENGTH + 1 {
                             self.game_logic.current_guess[self.index] = letter.to_ascii_uppercase();
-                            if self.index < 4 {
+                            if self.index < WORLD_LENGTH - 1 {
                                 self.index += 1;
                             }
                         } else {
                             let _ = match letter {
                                 // enter -> submit guess
                                 '1' => {
-                                    match self.game_logic.submit_guess(self.dictionary.as_ref()){
-                                        GameState::CorrectGuess => {
+                                    match self.game_logic.submit_guess(self.dictionary.as_ref()) {
+                                        (GameState::CorrectGuess, _) => {
                                             self.update_alphabet_state();
                                             self.current_row += 1;
                                             self.index = 0;
                                             self.game_state = Some(GameState::CorrectGuess);
                                         }
-                                        GameState::WrongGuess => {
+                                        (GameState::WrongGuess, word) => {
                                             println!("{}", GameState::WrongGuess);
                                             self.game_state = Some(GameState::WrongGuess);
+                                            self.last_guessed_word = word;
                                         }
-                                        GameState::Lost => {
+                                        (GameState::Lost, _) => {
                                             self.game_state = Some(GameState::Lost);
                                         }
-                                        GameState::Won => {
+                                        (GameState::Won, _) => {
                                             self.game_state = Some(GameState::Won);
                                         }
                                     }
                                 }
                                 // backspace -> delete letter
                                 '2' => {
-                                    if self.index > 0 {
-                                        self.game_logic.current_guess[self.index] = ' ';
-                                        self.index -= 1;
+                                    // does the square already have a letter?
+                                    if self.game_logic.current_guess[self.index] != ' ' {
+                                        //remove it
+                                        self.game_logic.current_guess[self.index] = ' '
                                     }
-                                    else{
-                                        self.index = 4;
-                                        self.game_logic.current_guess[self.index] = ' ';
+                                    //take a step back and delete
+                                    else {
+                                        if self.index == 0 {
+                                        } else {
+                                            self.index -= 1;
+                                            self.game_logic.current_guess[self.index] = ' ';
+                                        }
                                     }
                                 }
                                 // space -> new game
@@ -203,20 +215,25 @@ impl MyEguiApp {
         }
     }
 
+    /// Function to keep track of which letters have been used and their appearance in the word.
     fn update_alphabet_state(&mut self) {
-        for (letters, states) in self.game_logic.guesses_letters.iter().zip(self.game_logic.guesses.iter_mut()){
-            for (letter, state) in letters.iter().zip(states.iter_mut()){
-                self.game_logic.alphabet.entry(*letter).and_modify(|e| {*e = *state});
+        for (letters, states) in self
+            .game_logic
+            .guesses_letters
+            .iter()
+            .zip(self.game_logic.guesses.iter_mut())
+        {
+            for (letter, state) in letters.iter().zip(states.iter_mut()) {
+                self.game_logic
+                    .alphabet
+                    .entry(*letter)
+                    .and_modify(|e| *e = *state);
             }
         }
     }
-}
 
-/// Eframe implementation for the app which is used for rendering
-impl eframe::App for MyEguiApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.handle_keyboard_input(ctx);
-
+    /// Function to consolidate all the updating on GUI
+    fn update_visuals(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered_justified(|ui| {
                 let button_size = egui::vec2(80.0, 80.0);
@@ -245,11 +262,27 @@ impl eframe::App for MyEguiApp {
                             };
 
                             let text = if letter == " " { "_" } else { &letter };
-                            let button = egui::Button::new(text)
-                                .min_size(button_size)
-                                .fill(cell_color);
+                            match cell_color{
+                                egui::Color32::GREEN => {
+                                    let button = egui::Button::new(RichText::new(text).color(egui::Color32::BLACK))
+                                    .min_size(button_size)
+                                    .fill(cell_color);
+                                    ui.add(button);
+                                }
+                                egui::Color32::YELLOW => {
+                                    let button = egui::Button::new(RichText::new(text).color(egui::Color32::BLACK))
+                                    .min_size(button_size)
+                                    .fill(cell_color);
+                                    ui.add(button);
+                                }
+                                _ => {
+                                    let button = egui::Button::new(text)
+                                    .min_size(button_size)
+                                    .fill(cell_color);
+                                    ui.add(button);
+                                }
+                            }
 
-                            ui.add(button);
                         }
                     });
                     ui.add_space(5.0);
@@ -282,22 +315,23 @@ impl eframe::App for MyEguiApp {
                 ui.vertical_centered_justified(|ui| {
                     if ui.button("Submit Guess").clicked() {
                         match self.game_logic.submit_guess(self.dictionary.as_ref()){
-                            GameState::CorrectGuess => {
+                            (GameState::CorrectGuess, _) => {
                                 self.update_alphabet_state();
                                 self.current_row += 1;
                                 self.index = 0;
                                 self.game_state = Some(GameState::CorrectGuess);
                             }
-                            GameState::WrongGuess => {
+                            (GameState::WrongGuess, word) => {
                                 println!("{}", GameState::WrongGuess);
                                 self.game_state = Some(GameState::WrongGuess);
+                                self.last_guessed_word = word;
                             }
-                            GameState::Lost => {
+                            (GameState::Lost, _) => {
                                 self.game_state = Some(GameState::Lost);
                                 self.update_alphabet_state();
                                 self.current_row += 1;
                             }
-                            GameState::Won => {
+                            (GameState::Won, _) => {
                                 self.game_state = Some(GameState::Won);
                                 self.update_alphabet_state();
                                 self.current_row += 1;
@@ -313,24 +347,35 @@ impl eframe::App for MyEguiApp {
                 });
 
                 ui.add_space(20.0);
-                match self.game_state {
-                    Some(GameState::CorrectGuess) => {}
-                    Some(GameState::WrongGuess) => {
-                        ui.label("Word is not long enough or not in the dicitonary");
+                egui::ScrollArea::vertical().show(ui, |ui|{
+                    match self.game_state {
+                        Some(GameState::CorrectGuess) => {}
+                        Some(GameState::WrongGuess) => {
+                            let guessed_word: String = self.last_guessed_word.clone().unwrap();
+                            ui.label(format!("{} is not long enough or not in the dicitonary", guessed_word));
+                        }
+                        Some(GameState::Lost) => {
+                            ui.label(format!("Sorry you lost. The word was: {} \n Here's the defintion of the word if you are curious: \n {}", self.word, self.definition));
+                        }
+                        Some(GameState::Won) => {
+                            ui.label(format!(
+                                "Congratulations you won! Here's the definition of the word if you are curious: \n{}",
+                                self.definition
+                            ));
+                        }
+                        _ => {}
                     }
-                    Some(GameState::Lost) => {
-                        ui.label(format!("Sorry you lost. The word was: {}", self.word));
-                    }
-                    Some(GameState::Won) => {
-                        ui.label(format!(
-                            "Congratulations you won! Here's the definition of the word if you are curious: {}",
-                            self.definition
-                        ));
-                    }
-                    _ => {}
-                }
+                })
+
             });
         });
     }
 }
 
+/// Eframe implementation for the app which is used for rendering
+impl eframe::App for MyEguiApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.handle_keyboard_input(ctx);
+        self.update_visuals(ctx);
+    }
+}

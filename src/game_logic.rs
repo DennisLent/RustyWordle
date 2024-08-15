@@ -1,15 +1,16 @@
-use std::collections::HashMap;
 use crate::states::{GameState, LetterState};
+use crate::WORLD_LENGTH;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 /// This struct contains the main logic behind the wordle game.
 /// It holds all the previous guesses and the state of each letter.
 pub struct WordleGame {
     word: String,
-    pub current_guess: [char; 5],
+    pub current_guess: [char; WORLD_LENGTH],
     pub current_row: usize,
-    pub guesses: Vec<[LetterState; 5]>,
-    pub guesses_letters: Vec<[char; 5]>,
+    pub guesses: Vec<[LetterState; WORLD_LENGTH]>,
+    pub guesses_letters: Vec<[char; WORLD_LENGTH]>,
     pub alphabet: HashMap<char, LetterState>,
 }
 
@@ -19,7 +20,7 @@ impl WordleGame {
     pub fn new(word: String) -> Self {
         Self {
             word: word.to_uppercase(),
-            current_guess: [' '; 5],
+            current_guess: [' '; WORLD_LENGTH],
             current_row: 0,
             guesses: Vec::new(),
             guesses_letters: Vec::new(),
@@ -32,11 +33,10 @@ impl WordleGame {
     ///
     /// **Example**: Boats is not in the dictionary, however boat is
     fn is_valid_word(&self, word: String, dictionary: &HashMap<String, String>) -> bool {
-        
         if dictionary.contains_key(&word) {
             return true;
         }
-        
+
         let possible_bases = vec![
             word.strip_suffix('s'),
             word.strip_suffix("es"),
@@ -60,21 +60,21 @@ impl WordleGame {
     pub fn submit_guess(
         &mut self,
         dictionary: &HashMap<String, String>,
-    ) -> GameState {
+    ) -> (GameState, Option<String>) {
         // check if we have exceeded the maximum row count
-        if self.current_row >= 5 {
-            return GameState::Lost;
+        if self.current_row >= WORLD_LENGTH + 1 {
+            return (GameState::Lost, None);
         }
 
         let guess: String = self.current_guess.iter().collect();
         // check if there is an incomplete guess
         if guess.len() != 5 || self.current_guess.contains(&' ') {
-            return GameState::WrongGuess;
+            return (GameState::WrongGuess, Some(guess));
         }
 
         // check if the word submitted is a real word by cross-referencing in the dictionary
         if !self.is_valid_word(guess.clone().to_lowercase(), dictionary) {
-            return GameState::WrongGuess;
+            return (GameState::WrongGuess, Some(guess));
         }
 
         self.guesses_letters.push(self.current_guess);
@@ -83,14 +83,14 @@ impl WordleGame {
         let word_letters: Vec<char> = self.word.chars().collect();
 
         // check if correct letter in the correct position
-        for i in 0..5 {
+        for i in 0..WORLD_LENGTH {
             if self.current_guess[i] == word_letters[i] {
                 guess_state[i] = LetterState::Correct;
             }
         }
 
         // check if correct letter
-        for i in 0..5 {
+        for i in 0..WORLD_LENGTH {
             if guess_state[i] == LetterState::Correct {
                 continue;
             }
@@ -106,16 +106,15 @@ impl WordleGame {
         // store the guesses, update row and reset current guess
         self.guesses.push(guess_state);
         self.current_row += 1;
-        self.current_guess = [' '; 5];
+        self.current_guess = [' '; WORLD_LENGTH];
 
         if guess_state
             .iter()
             .all(|&state| state == LetterState::Correct)
         {
-            return GameState::Won;
-        }
-        else{
-            return GameState::CorrectGuess;
+            return (GameState::Won, None);
+        } else {
+            return (GameState::CorrectGuess, None);
         }
     }
 }

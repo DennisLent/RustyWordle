@@ -19,7 +19,7 @@ pub enum LetterState {
 /// - WrongGuess: the guess was not accepted
 /// - Won: the guess was the right word and the game is won
 /// - Lost: the game is lost
-pub enum GameState{
+pub enum GameState {
     CorrectGuess,
     WrongGuess,
     Won,
@@ -27,6 +27,7 @@ pub enum GameState{
 }
 
 impl fmt::Display for GameState {
+    /// format functionality solely used for debugging
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GameState::CorrectGuess => write!(f, "The guess was accepted"),

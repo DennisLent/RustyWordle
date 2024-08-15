@@ -29,9 +29,15 @@ pub fn json_to_hashmap() -> Result<HashMap<String, String>> {
 
 /// Helper funtion to choose a random word and definition from the cleaned dictionary hashmap.
 /// This function returns a Result(word, definiton).
-pub fn pick_random_word(dictionary: &HashMap<String, String>, word_length: usize) -> Result<(String, String)> {
+pub fn pick_random_word(
+    dictionary: &HashMap<String, String>,
+    word_length: usize,
+) -> Result<(String, String)> {
     // convert the dictionary keys (words) into a vector and pick a random word
-    let words: Vec<&String> = dictionary.keys().filter(|&word| word.len() == word_length).collect();
+    let words: Vec<&String> = dictionary
+        .keys()
+        .filter(|&word| word.len() == word_length)
+        .collect();
     let word = match words.choose(&mut rand::thread_rng()) {
         Some(&w) => w,
         None => {
